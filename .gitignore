@@ -1,0 +1,14 @@
+node_modules/
+
+# Environment variables — NEVER commit
+.env
+.env.local
+.env.production
+.env.example
+.env.qa
+*.log
+logs/
+coverage/
+.DS_Store
+docs
+.claude
