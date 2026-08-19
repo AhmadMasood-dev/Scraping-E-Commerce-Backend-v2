@@ -1,6 +1,6 @@
 // Groq provider — OpenAI-compatible chat completions REST (free tier, fast). No SDK; uses global fetch.
 const ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_MODEL = 'openai/gpt-oss-120b'; // llama-3.3-70b-versatile was retired (404) as of 2026-08
 
 async function call({ system, prompt, json = false, model = DEFAULT_MODEL, timeoutMs = 20000 }) {
   const key = process.env.GROQ_API_KEY;
