@@ -76,3 +76,26 @@ test('a slow getReviews (past the deadline) still yields a 200 with the empty sh
     global.setTimeout = origSetTimeout;
   }
 });
+
+test('clears the pending deadline timer once getReviews resolves first (no dangling timer)', async () => {
+  const validId = new db.mongoose.Types.ObjectId().toString();
+  Product.findById = () => ({ lean: async () => ({ _id: validId, name_en: 'iPhone 16' }) });
+  reviewEngineMod.getReviews = async () => ({ type: 'blog_sentiment', aggregate_score: 5, count: 1, reviews: [] });
+
+  const origSetTimeout = global.setTimeout;
+  const origClearTimeout = global.clearTimeout;
+  let capturedHandle;
+  let clearedWith;
+  global.setTimeout = (fn, ms) => { capturedHandle = origSetTimeout(fn, ms); return capturedHandle; };
+  global.clearTimeout = (handle) => { clearedWith = handle; origClearTimeout(handle); };
+
+  try {
+    const res = mockRes();
+    await getProduct({ params: { id: validId } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(clearedWith, capturedHandle);
+  } finally {
+    global.setTimeout = origSetTimeout;
+    global.clearTimeout = origClearTimeout;
+  }
+});

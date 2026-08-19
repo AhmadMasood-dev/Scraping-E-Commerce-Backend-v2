@@ -24,13 +24,19 @@ async function getProduct(req, res) {
     // client-side timeout + retry would restart a FRESH scrape each time. Race a 25s deadline instead:
     // the loser keeps running in the background and still persists via Review.insertMany, so the
     // NEXT request for this product is fast even though THIS one degraded to the empty shape.
+    // clearTimeout below cancels the deadline timer once getReviews wins — Promise.race doesn't do
+    // this itself, and an uncancelled timer keeps its callback (and the process/event loop) alive
+    // for the full 25s even after the response has already gone out.
+    let deadline;
+    const timeout = new Promise((resolve) => { deadline = setTimeout(() => resolve(EMPTY_REVIEWS), REVIEWS_TIMEOUT_MS); });
     const reviews = await Promise.race([
       reviewEngine.getReviews(product).catch((e) => {
         logger.error(`[product] getReviews failed: ${e.message}`);
         return EMPTY_REVIEWS;
       }),
-      new Promise((resolve) => setTimeout(() => resolve(EMPTY_REVIEWS), REVIEWS_TIMEOUT_MS)),
+      timeout,
     ]);
+    clearTimeout(deadline);
     return res.json({ success: true, product, reviews });
   } catch (e) {
     logger.error(`[product] ${e.message}\n${e.stack}`);
