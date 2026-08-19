@@ -7,6 +7,10 @@ const logger = require('../config/logger');
 
 const CATS = new Set(['A', 'B', 'C', 'D']);
 
+const SYSTEM =
+  'You are a product data normalization engine for a Pakistani e-commerce price-comparison app. ' +
+  'Given raw scraped product listings, clean and standardize them. Return ONLY a JSON object.';
+
 function passthrough(drafts) {
   return drafts.map((d) => ({
     ...d,
@@ -26,10 +30,15 @@ function buildPrompt(drafts) {
   }));
   return (
     'Normalize these Pakistani online-store product listings. For EACH item return an object ' +
-    '{"i": number, "name_en": clean product name, "name_ur": Urdu translation of name_en, ' +
-    '"brand": brand, "category": "A"|"B"|"C"|"D", "product_category": short product-type label ' +
+    '{"i": number, "name_en": clean product name (strip store names/junk codes), ' +
+    '"name_ur": Urdu translation of name_en — if no natural translation exists (model numbers, ' +
+    'brand names), use a phonetic Urdu transliteration instead; never leave it empty, ' +
+    '"brand": the manufacturer extracted from the name (e.g. "Samsung", "Apple", "Honda", "Nestle") ' +
+    '— empty string if no real brand is identifiable, ' +
+    '"category": "A"|"B"|"C"|"D", "product_category": short product-type label ' +
     '(e.g. "Mobile Phones", "Laptops", "Fashion")} where A=generic marketplace, B=niche/specialist ' +
-    'store, C=single-brand store, D=blog/review site (classify by the store). ' +
+    'store, C=single-brand store, D=blog/review site (classify by the store — infer generically, ' +
+    'do not assume a fixed list of stores). ' +
     'Return ONLY a JSON object {"items": [ ... ]}.\n' +
     JSON.stringify(list)
   );
@@ -63,7 +72,7 @@ async function normalizeProducts(drafts) {
     let res;
     try {
       res = await llm.runLLM({
-        system: 'You normalize e-commerce product data. Return ONLY a JSON object.',
+        system: SYSTEM,
         prompt: buildPrompt(drafts),
         json: true,
       });

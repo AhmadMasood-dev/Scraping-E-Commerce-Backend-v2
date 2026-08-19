@@ -55,6 +55,10 @@ function filterRelevant(items, query, titleField = 'name') {
   const qSet = new Set(qTokens);
 
   return items.filter((item) => {
+    // 0. Completeness gate: only save items we can actually show/compare — need an image and a price.
+    if (!item.image) return false;
+    if (!(item.price_pkr > 0)) return false;
+
     const tSet = new Set(tokenize(item[titleField] || item.name || item.title));
 
     // 1. Every significant query token must appear in the title.

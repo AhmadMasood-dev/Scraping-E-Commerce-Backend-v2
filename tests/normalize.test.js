@@ -75,3 +75,28 @@ test('LLM throws → passthrough sets product_category to empty by default', asy
   const [it] = await normalizeProducts([draft()]);
   assert.equal(it.product_category, '');
 });
+
+test('system prompt frames the task for a Pakistani e-commerce app', async () => {
+  let seenSystem = null;
+  llm.runLLM = async ({ system }) => { seenSystem = system; return { items: [{ i: 0, name_en: 'X' }] }; };
+  await normalizeProducts([draft()]);
+  assert.match(seenSystem, /Pakistani/);
+  assert.match(seenSystem, /e-commerce|price.?comparison/i);
+});
+
+test('user prompt gives brand-extraction examples and Urdu transliteration guidance', async () => {
+  let seenPrompt = null;
+  llm.runLLM = async ({ prompt }) => { seenPrompt = prompt; return { items: [{ i: 0, name_en: 'X' }] }; };
+  await normalizeProducts([draft()]);
+  assert.match(seenPrompt, /Samsung/);
+  assert.match(seenPrompt, /transliteration/i);
+});
+
+test('user prompt still classifies category generically, no hardcoded store list', async () => {
+  let seenPrompt = null;
+  llm.runLLM = async ({ prompt }) => { seenPrompt = prompt; return { items: [{ i: 0, name_en: 'X' }] }; };
+  await normalizeProducts([draft({ store_name: 'SomeOtherStore' })]);
+  // The instruction text itself must not hardcode specific store names — only the item's own
+  // store field (from the input data) is allowed to appear, and that's SomeOtherStore here.
+  assert.doesNotMatch(seenPrompt, /Daraz|PriceOye|Telemart/);
+});

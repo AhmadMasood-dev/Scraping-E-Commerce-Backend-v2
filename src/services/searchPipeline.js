@@ -51,6 +51,8 @@ function format(it) {
     category: CATS.includes(it.category) ? it.category : 'A',
     product_category: it.product_category || '',
     rating: it.rating ?? null,
+    description: it.description || '',
+    review_count: it.review_count ?? null,
   };
 }
 

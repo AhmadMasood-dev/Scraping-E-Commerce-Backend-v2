@@ -17,6 +17,8 @@ const productSchema = new mongoose.Schema({
   image_url: { type: String, default: '' },
   rating: { type: Number, default: null },
   available_in_store: { type: Boolean, default: false },
+  description: { type: String, default: '' },
+  review_count: { type: Number, default: null },
 }, { timestamps: true });
 
 productSchema.index({ store_name: 1, source_url: 1 }, { unique: true });

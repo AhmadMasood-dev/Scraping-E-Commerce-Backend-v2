@@ -55,9 +55,9 @@ test('relevance filter drops accessories + wrong variants', async () => {
   disc.discover = async () => ({
     links: [],
     directProducts: [
-      { name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999 },
-      { name: 'iPhone 17 Pro Max Cover', store_name: 'Daraz', price_pkr: 999 },
-      { name: 'iPhone 15', store_name: 'X', price_pkr: 200000 },
+      { name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, image: 'i' },
+      { name: 'iPhone 17 Pro Max Cover', store_name: 'Daraz', price_pkr: 999, image: 'i' },
+      { name: 'iPhone 15', store_name: 'X', price_pkr: 200000, image: 'i' },
     ],
   });
   normMod.normalizeProducts = passthrough;
@@ -76,7 +76,7 @@ test('no relevant results → empty payload, NOT cached', async () => {
 
 test('non-empty result is cached; second call is a cache hit', async () => {
   let calls = 0;
-  disc.discover = async () => { calls++; return { links: [], directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999 }] }; };
+  disc.discover = async () => { calls++; return { links: [], directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, image: 'i' }] }; };
   normMod.normalizeProducts = passthrough;
   await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
   const p2 = await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
@@ -87,13 +87,24 @@ test('non-empty result is cached; second call is a cache hit', async () => {
 test('one dead link is isolated (Promise.allSettled)', async () => {
   disc.discover = async () => ({ links: [{ url: 'https://a.pk/p' }, { url: 'https://b.pk/p' }], directProducts: [] });
   fetchMod.fetchPage = async (url) => { if (url.includes('a.pk')) throw new Error('dead'); return { finalUrl: url, html: '<html>' }; };
-  extractMod.extractProduct = async (url) => ({ name: 'iPhone 17 Pro Max', price_pkr: 468999, store_name: 'B', source_url: url });
+  extractMod.extractProduct = async (url) => ({ name: 'iPhone 17 Pro Max', price_pkr: 468999, store_name: 'B', source_url: url, image: 'i' });
   normMod.normalizeProducts = passthrough;
   assert.equal((await runSearch({ query: 'iphone 17 pro max' })).meta.total, 1);
 });
 
+test('formatted items carry description + review_count through', async () => {
+  disc.discover = async () => ({
+    links: [],
+    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, image: 'i', description: 'A great phone', review_count: 42 }],
+  });
+  normMod.normalizeProducts = passthrough;
+  const p = await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
+  assert.equal(p.results.A[0].description, 'A great phone');
+  assert.equal(p.results.A[0].review_count, 42);
+});
+
 test('formatted items carry product_category through from normalize', async () => {
-  disc.discover = async () => ({ links: [], directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p' }] });
+  disc.discover = async () => ({ links: [], directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p', image: 'i' }] });
   normMod.normalizeProducts = async (drafts) => drafts.map((d) => ({ ...d, name_en: 'iPhone 17 Pro Max', category: 'A', product_category: 'Mobile Phones' }));
   const p = await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
   assert.equal(p.results.A[0].product_category, 'Mobile Phones');
@@ -102,7 +113,7 @@ test('formatted items carry product_category through from normalize', async () =
 test('schedules a background persist of the formatted items (fire-and-forget)', async () => {
   disc.discover = async () => ({
     links: [],
-    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p' }],
+    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p', image: 'i' }],
   });
   normMod.normalizeProducts = passthrough;
   let calledWith = null;
@@ -117,7 +128,7 @@ test('schedules a background persist of the formatted items (fire-and-forget)', 
 test('attaches primary.similar from similar.findSimilar, called with the primary\'s own key + excluding its own comparison urls', async () => {
   disc.discover = async () => ({
     links: [],
-    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p' }],
+    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p', image: 'i' }],
   });
   normMod.normalizeProducts = async (drafts) => drafts.map((d) => ({ ...d, name_en: 'iPhone 17 Pro Max', category: 'A', product_category: 'Mobile Phones' }));
   let calledWith = null;
@@ -143,7 +154,7 @@ test('no primary (empty results) → similar.findSimilar is never called', async
 test('a failing background persist never breaks or delays the response', async () => {
   disc.discover = async () => ({
     links: [],
-    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p2' }],
+    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p2', image: 'i' }],
   });
   normMod.normalizeProducts = passthrough;
   persistMod.upsertAll = async () => { throw new Error('db down'); };

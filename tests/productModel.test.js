@@ -40,4 +40,6 @@ test('optional fields default sanely', () => {
   assert.equal(p.image_url, '');
   assert.equal(p.rating, null);
   assert.equal(p.available_in_store, false);
+  assert.equal(p.description, '');
+  assert.equal(p.review_count, null);
 });
