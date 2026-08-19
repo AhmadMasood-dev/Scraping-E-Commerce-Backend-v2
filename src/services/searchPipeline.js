@@ -9,6 +9,7 @@ const extractMod = require('../extract');
 const { filterRelevant } = require('../scrapers/utils/relevance');
 const normMod = require('./normalize');
 const { buildComparison } = require('./comparison');
+const persistMod = require('./persist');
 const logger = require('../config/logger');
 
 const CATS = ['A', 'B', 'C', 'D'];
@@ -85,7 +86,12 @@ async function runSearch({ query, description = '', city = 'islamabad', lang } =
   const { primary, storeResults } = buildComparison(items);
 
   const results = { A: [], B: [], C: [], D: [] };
-  for (const it of items) results[CATS.includes(it.category) ? it.category : 'A'].push(format(it));
+  const formatted = [];
+  for (const it of items) {
+    const f = format(it);
+    formatted.push(f);
+    results[CATS.includes(it.category) ? it.category : 'A'].push(f);
+  }
 
   const payload = {
     cached: false,
@@ -95,6 +101,11 @@ async function runSearch({ query, description = '', city = 'islamabad', lang } =
     meta: { ...baseMeta, total: items.length, durationMs: Date.now() - start },
   };
   cache.set(cacheKey, payload); // cache only non-empty
+
+  setImmediate(() => {
+    persistMod.upsertAll(formatted, city).catch((e) => logger.warn(`[search] background persist failed: ${e.message}`));
+  });
+
   return payload;
 }
 

@@ -6,6 +6,7 @@ const disc = require('../src/discovery');
 const fetchMod = require('../src/extract/fetchPage');
 const extractMod = require('../src/extract');
 const normMod = require('../src/services/normalize');
+const persistMod = require('../src/services/persist');
 const { runSearch } = require('../src/services/searchPipeline');
 
 const orig = {
@@ -13,6 +14,7 @@ const orig = {
   fetchPage: fetchMod.fetchPage,
   extractProduct: extractMod.extractProduct,
   normalizeProducts: normMod.normalizeProducts,
+  upsertAll: persistMod.upsertAll,
 };
 const passthrough = async (drafts) => drafts.map((d) => ({ ...d, name_en: d.name_en || d.name, category: d.category || 'A' }));
 
@@ -22,6 +24,7 @@ beforeEach(() => {
   fetchMod.fetchPage = orig.fetchPage;
   extractMod.extractProduct = orig.extractProduct;
   normMod.normalizeProducts = orig.normalizeProducts;
+  persistMod.upsertAll = orig.upsertAll;
 });
 
 test('short query → error', async () => {
@@ -91,4 +94,30 @@ test('formatted items carry product_category through from normalize', async () =
   normMod.normalizeProducts = async (drafts) => drafts.map((d) => ({ ...d, name_en: 'iPhone 17 Pro Max', category: 'A', product_category: 'Mobile Phones' }));
   const p = await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
   assert.equal(p.results.A[0].product_category, 'Mobile Phones');
+});
+
+test('schedules a background persist of the formatted items (fire-and-forget)', async () => {
+  disc.discover = async () => ({
+    links: [],
+    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p' }],
+  });
+  normMod.normalizeProducts = passthrough;
+  let calledWith = null;
+  persistMod.upsertAll = async (items, city) => { calledWith = { items, city }; };
+  await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(calledWith.items.length, 1);
+  assert.equal(calledWith.items[0].store_name, 'Daraz');
+  assert.equal(calledWith.city, 'islamabad');
+});
+
+test('a failing background persist never breaks or delays the response', async () => {
+  disc.discover = async () => ({
+    links: [],
+    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p2' }],
+  });
+  normMod.normalizeProducts = passthrough;
+  persistMod.upsertAll = async () => { throw new Error('db down'); };
+  const p = await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
+  assert.equal(p.meta.total, 1);
 });
