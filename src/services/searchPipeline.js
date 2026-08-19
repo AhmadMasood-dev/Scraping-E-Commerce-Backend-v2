@@ -10,6 +10,7 @@ const { filterRelevant } = require('../scrapers/utils/relevance');
 const normMod = require('./normalize');
 const { buildComparison } = require('./comparison');
 const persistMod = require('./persist');
+const similarMod = require('./similar');
 const logger = require('../config/logger');
 
 const CATS = ['A', 'B', 'C', 'D'];
@@ -84,6 +85,15 @@ async function runSearch({ query, description = '', city = 'islamabad', lang } =
 
   const items = await normMod.normalizeProducts(relevant);
   const { primary, storeResults } = buildComparison(items);
+
+  if (primary) {
+    primary.similar = await similarMod.findSimilar({
+      product_category: primary.product_category,
+      category: primary.category,
+      price_pkr: primary.comparisons[0].price_pkr,
+      excludeUrls: primary.comparisons.map((c) => c.source_url),
+    });
+  }
 
   const results = { A: [], B: [], C: [], D: [] };
   const formatted = [];

@@ -66,6 +66,7 @@ function buildComparison(items) {
     name_en: head.name_en || head.name || '',
     name_ur: head.name_ur || '',
     category: head.category || 'A',
+    product_category: head.product_category || '',
     image_url: comparisons.find((c) => c.image_url)?.image_url || '',
     rating: head.rating ?? null,
     comparisons,

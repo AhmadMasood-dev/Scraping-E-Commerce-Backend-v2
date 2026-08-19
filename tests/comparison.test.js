@@ -20,3 +20,9 @@ test('same product across two stores → primary with savings + cheapest_store',
 test('drops zero-price items from storeResults', () => {
   assert.equal(buildComparison([{ name_en: 'x', store_name: 'A', price_pkr: 0 }]).storeResults.length, 0);
 });
+test('primary carries product_category from the head item', () => {
+  const { primary } = buildComparison([
+    { name_en: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 490000, source_url: 'd', product_category: 'Mobile Phones' },
+  ]);
+  assert.equal(primary.product_category, 'Mobile Phones');
+});
