@@ -47,6 +47,7 @@ function format(it) {
     source_url: it.source_url || it.url || '',
     store_name: it.store_name || '',
     category: CATS.includes(it.category) ? it.category : 'A',
+    product_category: it.product_category || '',
     rating: it.rating ?? null,
   };
 }

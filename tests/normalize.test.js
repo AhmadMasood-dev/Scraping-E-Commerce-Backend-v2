@@ -63,3 +63,15 @@ test('recovers on the second attempt (flaky first call)', async () => {
   assert.equal(calls, 2);
   assert.equal(it.name_en, 'iPhone 17 Pro Max');
 });
+
+test('merges product_category from LLM output', async () => {
+  llm.runLLM = async () => ({ items: [{ i: 0, name_en: 'iPhone 17 Pro Max', category: 'B', product_category: 'Mobile Phones' }] });
+  const [it] = await normalizeProducts([draft()]);
+  assert.equal(it.product_category, 'Mobile Phones');
+});
+
+test('LLM throws → passthrough sets product_category to empty by default', async () => {
+  llm.runLLM = async () => { throw new Error('quota'); };
+  const [it] = await normalizeProducts([draft()]);
+  assert.equal(it.product_category, '');
+});

@@ -85,3 +85,10 @@ test('one dead link is isolated (Promise.allSettled)', async () => {
   normMod.normalizeProducts = passthrough;
   assert.equal((await runSearch({ query: 'iphone 17 pro max' })).meta.total, 1);
 });
+
+test('formatted items carry product_category through from normalize', async () => {
+  disc.discover = async () => ({ links: [], directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p' }] });
+  normMod.normalizeProducts = async (drafts) => drafts.map((d) => ({ ...d, name_en: 'iPhone 17 Pro Max', category: 'A', product_category: 'Mobile Phones' }));
+  const p = await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
+  assert.equal(p.results.A[0].product_category, 'Mobile Phones');
+});

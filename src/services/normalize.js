@@ -1,6 +1,7 @@
 // Batched normalize: raw ProductDrafts → clean, comparable, translated, categorized items in ONE LLM
-// call. Enriches (name_en/name_ur/brand/category) but NEVER touches price (already validated). Graceful:
-// on LLM failure/invalid output it retries once then falls back to passthrough so search keeps working.
+// call. Enriches (name_en/name_ur/brand/category/product_category) but NEVER touches price (already
+// validated). Graceful: on LLM failure/invalid output it retries once then falls back to passthrough
+// so search keeps working.
 const llm = require('../llm');
 const logger = require('../config/logger');
 
@@ -13,6 +14,7 @@ function passthrough(drafts) {
     name_ur: d.name_ur || '',
     brand: d.brand || '',
     category: CATS.has(d.category) ? d.category : 'A',
+    product_category: d.product_category || '',
   }));
 }
 
@@ -25,8 +27,9 @@ function buildPrompt(drafts) {
   return (
     'Normalize these Pakistani online-store product listings. For EACH item return an object ' +
     '{"i": number, "name_en": clean product name, "name_ur": Urdu translation of name_en, ' +
-    '"brand": brand, "category": "A"|"B"|"C"|"D"} where A=generic marketplace, B=niche/specialist store, ' +
-    'C=single-brand store, D=blog/review site (classify by the store). ' +
+    '"brand": brand, "category": "A"|"B"|"C"|"D", "product_category": short product-type label ' +
+    '(e.g. "Mobile Phones", "Laptops", "Fashion")} where A=generic marketplace, B=niche/specialist ' +
+    'store, C=single-brand store, D=blog/review site (classify by the store). ' +
     'Return ONLY a JSON object {"items": [ ... ]}.\n' +
     JSON.stringify(list)
   );
@@ -47,6 +50,7 @@ function mergeByIndex(drafts, items) {
       name_ur: o.name_ur ? String(o.name_ur).trim() : '',
       brand: o.brand ? String(o.brand).trim() : d.brand || '',
       category: CATS.has(o.category) ? o.category : 'A',
+      product_category: o.product_category ? String(o.product_category).trim() : d.product_category || '',
     };
   });
   return out.some((x) => x === null) ? null : out;
