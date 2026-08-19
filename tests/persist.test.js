@@ -4,13 +4,15 @@ const assert = require('node:assert');
 const Store = require('../src/models/Store');
 const Product = require('../src/models/Product');
 const db = require('../src/config/db');
-const { upsertProduct, upsertAll } = require('../src/services/persist');
+const { upsertProduct, upsertAll, resolveIds } = require('../src/services/persist');
 
 const origStoreFind = Store.find;
 const origProductUpdate = Product.findOneAndUpdate;
+const origProductFind = Product.find;
 beforeEach(() => {
   Store.find = origStoreFind;
   Product.findOneAndUpdate = origProductUpdate;
+  Product.find = origProductFind;
   db.mongoose.connection.readyState = 1;
 });
 
@@ -83,4 +85,34 @@ test('upsertAll is a no-op when Mongo is not connected', async () => {
   await upsertAll([item()], 'islamabad');
   assert.equal(storeFindCalled, false);
   assert.equal(productUpdateCalled, false);
+});
+
+test('resolveIds reuses an existing product\'s _id (matched by store_name+source_url)', async () => {
+  const existingId = new db.mongoose.Types.ObjectId();
+  Product.find = async () => [{ _id: existingId, store_name: 'daraz.pk', source_url: 'https://daraz.pk/p' }];
+  const [out] = await resolveIds([{ store_name: 'daraz.pk', source_url: 'https://daraz.pk/p' }]);
+  assert.equal(String(out._id), String(existingId));
+});
+
+test('resolveIds mints a fresh _id for an item with no existing product', async () => {
+  Product.find = async () => [];
+  const [out] = await resolveIds([{ store_name: 'daraz.pk', source_url: 'https://daraz.pk/new' }]);
+  assert.ok(db.mongoose.Types.ObjectId.isValid(out._id));
+});
+
+test('resolveIds returns items unchanged when Mongo is not connected', async () => {
+  db.mongoose.connection.readyState = 0;
+  let called = false;
+  Product.find = async () => { called = true; return []; };
+  const items = [{ store_name: 'daraz.pk', source_url: 'https://daraz.pk/p' }];
+  const out = await resolveIds(items);
+  assert.equal(called, false);
+  assert.deepEqual(out, items);
+});
+
+test('resolveIds returns [] unchanged for an empty items array', async () => {
+  let called = false;
+  Product.find = async () => { called = true; return []; };
+  assert.deepEqual(await resolveIds([]), []);
+  assert.equal(called, false);
 });

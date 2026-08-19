@@ -36,6 +36,28 @@ async function upsertProduct(item, city) {
   );
 }
 
+// resolveIds(items): for each item, reuse the existing Product's _id (by store_name+source_url) if
+// one exists, else mint a fresh id client-side — so the search response can include a stable,
+// real _id immediately, before the background upsert (which reuses these same ids) ever runs.
+// See docs/plans/2026-08-20-phase-6c-review-engine-design.md §3 for the full timing reasoning.
+// Gracefully returns items unchanged (no _id) when Mongo isn't connected.
+async function resolveIds(items) {
+  if (db.mongoose.connection.readyState !== 1) return items;
+  if (!items.length) return items;
+
+  const existing = await Product.find(
+    { $or: items.map((it) => ({ store_name: it.store_name, source_url: it.source_url })) },
+    { store_name: 1, source_url: 1 }
+  );
+  const key = (storeName, sourceUrl) => `${storeName}::${sourceUrl}`;
+  const byKey = new Map(existing.map((doc) => [key(doc.store_name, doc.source_url), doc._id]));
+
+  return items.map((it) => ({
+    ...it,
+    _id: byKey.get(key(it.store_name, it.source_url)) || new db.mongoose.Types.ObjectId(),
+  }));
+}
+
 async function upsertAll(items, city) {
   if (db.mongoose.connection.readyState !== 1) return; // ponytail: no live Mongo connection, nothing to persist
   for (const item of items) {
@@ -47,4 +69,4 @@ async function upsertAll(items, city) {
   }
 }
 
-module.exports = { upsertProduct, upsertAll, findStore, domainKey };
+module.exports = { upsertProduct, upsertAll, findStore, domainKey, resolveIds };
