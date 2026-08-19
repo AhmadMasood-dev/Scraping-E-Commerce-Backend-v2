@@ -11,7 +11,13 @@ const normMod = require('./normalize');
 const { buildComparison } = require('./comparison');
 const persistMod = require('./persist');
 const similarMod = require('./similar');
+const { createLimiter } = require('../config/limiter');
 const logger = require('../config/logger');
+
+// Caps concurrent outbound page-fetches *across simultaneous searches* (#12) — per-search fetch
+// count is already implicitly bounded by discovery's ~8-link cap; this protects against many
+// searches happening at once piling onto the same shared quota/bandwidth.
+const limitFetch = createLimiter(4);
 
 const CATS = ['A', 'B', 'C', 'D'];
 const hostOf = (u) => {
@@ -69,7 +75,7 @@ async function runSearch({ query, description = '', city = 'islamabad', lang } =
   const { links, directProducts } = await disc.discover(nlp.normalized, { city });
   const partial = links.length === 0 && directProducts.length === 0;
 
-  const settled = await Promise.allSettled(links.map(extractFromLink));
+  const settled = await Promise.allSettled(links.map((l) => limitFetch(() => extractFromLink(l))));
   const extracted = settled.filter((r) => r.status === 'fulfilled' && r.value).map((r) => r.value);
 
   const rawItems = [...directProducts, ...extracted];

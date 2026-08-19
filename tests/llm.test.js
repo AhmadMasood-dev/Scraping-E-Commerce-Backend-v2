@@ -102,3 +102,17 @@ test('parseJson handles plain and fenced JSON', () => {
 test('runLLM requires a prompt', async () => {
   await assert.rejects(() => runLLM({}), /prompt is required/);
 });
+
+test('caps concurrent provider calls across simultaneous runLLM invocations', async () => {
+  let active = 0;
+  let peak = 0;
+  PROVIDERS.gemini.call = async () => {
+    active++;
+    peak = Math.max(peak, active);
+    await new Promise((r) => setTimeout(r, 10));
+    active--;
+    return 'OK';
+  };
+  await Promise.all(Array.from({ length: 6 }, () => runLLM({ prompt: 'x' })));
+  assert.ok(peak < 6, `peak concurrent LLM calls was ${peak}, expected a real cap below 6`);
+});

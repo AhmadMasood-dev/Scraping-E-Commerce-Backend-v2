@@ -151,6 +151,31 @@ test('no primary (empty results) → similar.findSimilar is never called', async
   assert.equal(called, false);
 });
 
+test('caps concurrent page-fetches across simultaneous searches', async () => {
+  let active = 0;
+  let peak = 0;
+  disc.discover = async () => ({
+    links: Array.from({ length: 3 }, (_, i) => ({ url: `https://a.pk/${i}` })),
+    directProducts: [],
+  });
+  fetchMod.fetchPage = async (url) => {
+    active++;
+    peak = Math.max(peak, active);
+    await new Promise((r) => setTimeout(r, 10));
+    active--;
+    return { finalUrl: url, html: '<html>' };
+  };
+  extractMod.extractProduct = async (url) => ({ name: 'iPhone 17 Pro Max', price_pkr: 468999, store_name: 'B', source_url: url, image: 'i' });
+  normMod.normalizeProducts = passthrough;
+
+  // Two concurrent searches, each with 3 links → 6 total page-fetches in flight if uncapped.
+  await Promise.all([
+    runSearch({ query: 'iphone 17 pro max a' }),
+    runSearch({ query: 'iphone 17 pro max b' }),
+  ]);
+  assert.ok(peak < 6, `peak concurrent page-fetches was ${peak}, expected a real cap below 6`);
+});
+
 test('a failing background persist never breaks or delays the response', async () => {
   disc.discover = async () => ({
     links: [],

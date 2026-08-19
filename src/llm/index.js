@@ -4,6 +4,11 @@
 const gemini = require('./providers/gemini');
 const groq = require('./providers/groq');
 const logger = require('../config/logger');
+const { createLimiter } = require('../config/limiter');
+
+// Caps concurrent outbound LLM calls *across simultaneous searches* (#12) — normalize.js and
+// llmExtract.js both go through runLLM, so this one limiter covers every LLM call site.
+const limitLLM = createLimiter(3);
 
 // LLM providers. Chain: Gemini (free, primary) → Groq (free, fallback). Claude was removed for now;
 // re-adding a provider is just a new file here + its id in LLM_FALLBACKS.
@@ -54,7 +59,7 @@ async function runLLM({ system, prompt, json = false, model } = {}) {
       continue;
     }
     try {
-      const text = await PROVIDERS[id].call({ system, prompt, json, model });
+      const text = await limitLLM(() => PROVIDERS[id].call({ system, prompt, json, model }));
       return json ? parseJson(text) : text;
     } catch (err) {
       lastErr = err;

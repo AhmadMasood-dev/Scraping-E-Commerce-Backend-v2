@@ -38,6 +38,26 @@ function diceSimilarity(a, b) {
   return (2 * intersection) / (s1.length - 1 + (s2.length - 1));
 }
 
+// Storage/RAM capacity tokens in a title (e.g. "256GB", "8GB") — the one variant dimension that
+// directly changes fair price. Dice-bigram similarity alone can't tell "...256GB Storage" from
+// "...512GB Storage" apart (they share almost every bigram), so two titles are only allowed to
+// cluster as "the same product" when their capacity-token sets don't conflict (#11).
+function variantTokens(title) {
+  const matches = String(title || '').toUpperCase().match(/\d+\s?(?:GB|TB|MB)\b/g) || [];
+  return new Set(matches.map((t) => t.replace(/\s+/g, '')));
+}
+
+// True unless both titles mention capacity and disagree on which. If only one (or neither)
+// title mentions capacity, we can't tell — don't block the cluster on a guess.
+function variantsCompatible(a, b) {
+  const ta = variantTokens(a);
+  const tb = variantTokens(b);
+  if (ta.size === 0 || tb.size === 0) return true;
+  if (ta.size !== tb.size) return false;
+  for (const t of ta) if (!tb.has(t)) return false;
+  return true;
+}
+
 // Group items by title similarity. Each item is matched against the first
 // member of existing groups; otherwise it starts a new group.
 // titleField lets callers cluster on name_en (classified) or name (raw).
@@ -48,7 +68,7 @@ function group(items, titleField = 'name_en') {
     let matched = false;
     for (const g of groups) {
       const gTitle = g[0][titleField] || g[0].name_en || g[0].name || g[0].title || '';
-      if (diceSimilarity(title, gTitle) >= SIMILARITY_THRESHOLD) {
+      if (diceSimilarity(title, gTitle) >= SIMILARITY_THRESHOLD && variantsCompatible(title, gTitle)) {
         g.push(item);
         matched = true;
         break;
@@ -59,4 +79,4 @@ function group(items, titleField = 'name_en') {
   return groups;
 }
 
-module.exports = { group, diceSimilarity, normalize, SIMILARITY_THRESHOLD };
+module.exports = { group, diceSimilarity, normalize, SIMILARITY_THRESHOLD, variantTokens, variantsCompatible };
