@@ -4,15 +4,22 @@ const assert = require('node:assert');
 const llm = require('../src/llm');
 const searchMod = require('../src/discovery/searchApi');
 const fetchMod = require('../src/extract/fetchPage');
-const { scoreArticleSentiment, findArticles } = require('../src/services/reviewEngine');
+const Review = require('../src/models/Review');
+const db = require('../src/config/db');
+const { scoreArticleSentiment, findArticles, getReviews } = require('../src/services/reviewEngine');
 
 const origRun = llm.runLLM;
 const origSearchWeb = searchMod.searchWeb;
 const origFetchPage = fetchMod.fetchPage;
+const origReviewFind = Review.find;
+const origReviewInsertMany = Review.insertMany;
 beforeEach(() => {
   llm.runLLM = origRun;
   searchMod.searchWeb = origSearchWeb;
   fetchMod.fetchPage = origFetchPage;
+  Review.find = origReviewFind;
+  Review.insertMany = origReviewInsertMany;
+  db.mongoose.connection.readyState = 1;
 });
 
 test('returns score + summary for a relevant article', async () => {
@@ -75,4 +82,65 @@ test('findArticles filters out unsafe/denylisted links via urlGuard', async () =
   const out = await findArticles('iPhone 16');
   assert.equal(out.length, 1);
   assert.equal(out[0].url, 'https://blog1.pk/a');
+});
+
+const product = (over = {}) => ({ _id: 'prod-1', name_en: 'iPhone 16', ...over });
+
+test('returns cached reviews immediately without re-scraping', async () => {
+  Review.find = () => ({ lean: async () => [{ source: 'blog_sentiment', score: 4, review_date: new Date() }] });
+  let searchCalled = false;
+  searchMod.searchWeb = async () => { searchCalled = true; return []; };
+  const out = await getReviews(product());
+  assert.equal(out.type, 'blog_sentiment');
+  assert.equal(out.count, 1);
+  assert.equal(searchCalled, false);
+});
+
+test('scrapes, scores, persists, and returns fresh reviews on a cache miss', async () => {
+  Review.find = () => ({ lean: async () => [] });
+  searchMod.searchWeb = async () => [{ url: 'https://blog1.pk/a' }];
+  fetchMod.fetchPage = async (url) => ({ finalUrl: url, html: '<p>great phone review</p>' });
+  llm.runLLM = async () => ({ relevant: true, score: 5, summary: 'Excellent.' });
+  let persisted = null;
+  Review.insertMany = async (docs) => { persisted = docs; };
+
+  const out = await getReviews(product());
+
+  assert.equal(out.type, 'blog_sentiment');
+  assert.equal(out.count, 1);
+  assert.equal(out.aggregate_score, 5);
+  assert.equal(persisted[0].product_id, 'prod-1');
+  assert.equal(persisted[0].blog_url, 'https://blog1.pk/a');
+});
+
+test('no relevant articles found → graceful empty response, nothing persisted', async () => {
+  Review.find = () => ({ lean: async () => [] });
+  searchMod.searchWeb = async () => [{ url: 'https://blog1.pk/a' }];
+  fetchMod.fetchPage = async (url) => ({ finalUrl: url, html: '<p>unrelated text</p>' });
+  llm.runLLM = async () => ({ relevant: false, score: null, summary: '' });
+  let insertCalled = false;
+  Review.insertMany = async () => { insertCalled = true; };
+
+  const out = await getReviews(product());
+
+  assert.deepEqual(out, { type: 'none', aggregate_score: null, count: 0, reviews: [] });
+  assert.equal(insertCalled, false);
+});
+
+test('skips the DB cache check and persist step when Mongo is not connected, still returns live results', async () => {
+  db.mongoose.connection.readyState = 0;
+  let findCalled = false;
+  Review.find = () => { findCalled = true; return { lean: async () => [] }; };
+  searchMod.searchWeb = async () => [{ url: 'https://blog1.pk/a' }];
+  fetchMod.fetchPage = async (url) => ({ finalUrl: url, html: '<p>great phone</p>' });
+  llm.runLLM = async () => ({ relevant: true, score: 4, summary: 'Good.' });
+  let insertCalled = false;
+  Review.insertMany = async () => { insertCalled = true; };
+
+  const out = await getReviews(product());
+
+  assert.equal(findCalled, false);
+  assert.equal(insertCalled, false);
+  assert.equal(out.count, 1);
+  assert.equal(out.aggregate_score, 4);
 });
