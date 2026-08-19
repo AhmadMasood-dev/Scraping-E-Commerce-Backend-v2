@@ -32,6 +32,20 @@ test('decayFor: unknown/invalid date → treated as old (0.4, false)', () => {
   assert.equal(within_timeframe, false);
 });
 
+test('decayFor: boundary 182 days → weight 0.7, within_timeframe true', () => {
+  const now = new Date('2026-08-20T00:00:00Z');
+  const { weight, within_timeframe } = decayFor(daysAgo(182, now), now);
+  assert.equal(weight, 0.7);
+  assert.equal(within_timeframe, true);
+});
+
+test('decayFor: boundary 548 days → weight 0.4, within_timeframe false', () => {
+  const now = new Date('2026-08-20T00:00:00Z');
+  const { weight, within_timeframe } = decayFor(daysAgo(548, now), now);
+  assert.equal(weight, 0.4);
+  assert.equal(within_timeframe, false);
+});
+
 test('aggregateScore: weighted average across mixed-age reviews', () => {
   const now = new Date('2026-08-20T00:00:00Z');
   const reviews = [
