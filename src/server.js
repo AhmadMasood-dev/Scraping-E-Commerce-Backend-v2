@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { search } = require('./controllers/search');
 const logger = require('./config/logger');
+const db = require('./config/db');
 
 const app = express();
 
@@ -38,10 +39,12 @@ app.get('/api/v1/search', search);
 const PORT = process.env.PORT || 8080;
 
 if (require.main === module) {
+  db.connect().catch((e) => logger.warn(`[db] connect failed: ${e.message}`));
   const server = app.listen(PORT, () => logger.info(`[server] PQC v2 listening on http://localhost:${PORT}`));
   const shutdown = () => {
     logger.info('[server] shutting down');
     server.close(() => process.exit(0));
+    db.disconnect().catch(() => {});
     setTimeout(() => process.exit(0), 3000).unref();
   };
   process.on('SIGTERM', shutdown);

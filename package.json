@@ -7,13 +7,15 @@
   "scripts": {
     "test": "node --test",
     "start": "node --env-file=.env src/server.js",
-    "dev": "node --env-file=.env --watch src/server.js"
+    "dev": "node --env-file=.env --watch src/server.js",
+    "seed": "node --env-file=.env src/seed/run.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "mongoose": "^8.7.0"
   }
 }
