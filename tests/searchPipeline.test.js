@@ -17,6 +17,7 @@ const orig = {
   normalizeProducts: normMod.normalizeProducts,
   upsertAll: persistMod.upsertAll,
   findSimilar: similarMod.findSimilar,
+  resolveIds: persistMod.resolveIds,
 };
 const passthrough = async (drafts) => drafts.map((d) => ({ ...d, name_en: d.name_en || d.name, category: d.category || 'A' }));
 
@@ -28,6 +29,7 @@ beforeEach(() => {
   normMod.normalizeProducts = orig.normalizeProducts;
   persistMod.upsertAll = orig.upsertAll;
   similarMod.findSimilar = orig.findSimilar;
+  persistMod.resolveIds = orig.resolveIds;
 });
 
 test('short query → error', async () => {
@@ -174,6 +176,24 @@ test('caps concurrent page-fetches across simultaneous searches', async () => {
     runSearch({ query: 'iphone 17 pro max b' }),
   ]);
   assert.ok(peak < 6, `peak concurrent page-fetches was ${peak}, expected a real cap below 6`);
+});
+
+test('includes each item\'s resolved _id in the response and passes the same ids to persist', async () => {
+  disc.discover = async () => ({
+    links: [],
+    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, image: 'i', source_url: 'https://daraz.pk/p' }],
+  });
+  normMod.normalizeProducts = passthrough;
+  const fakeId = 'fake-object-id-123';
+  persistMod.resolveIds = async (items) => items.map((it) => ({ ...it, _id: fakeId }));
+  let persistedWith = null;
+  persistMod.upsertAll = async (items) => { persistedWith = items; };
+
+  const p = await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
+
+  assert.equal(p.results.A[0]._id, fakeId);
+  await new Promise((r) => setImmediate(r));
+  assert.equal(persistedWith[0]._id, fakeId);
 });
 
 test('a failing background persist never breaks or delays the response', async () => {

@@ -103,12 +103,12 @@ async function runSearch({ query, description = '', city = 'islamabad', lang } =
     });
   }
 
+  const formatted = items.map((it) => format(it));
+  const withIds = await persistMod.resolveIds(formatted);
+
   const results = { A: [], B: [], C: [], D: [] };
-  const formatted = [];
-  for (const it of items) {
-    const f = format(it);
-    formatted.push(f);
-    results[CATS.includes(it.category) ? it.category : 'A'].push(f);
+  for (let i = 0; i < items.length; i++) {
+    results[CATS.includes(items[i].category) ? items[i].category : 'A'].push(withIds[i]);
   }
 
   const payload = {
@@ -121,7 +121,7 @@ async function runSearch({ query, description = '', city = 'islamabad', lang } =
   cache.set(cacheKey, payload); // cache only non-empty
 
   setImmediate(() => {
-    persistMod.upsertAll(formatted, city).catch((e) => logger.warn(`[search] background persist failed: ${e.message}`));
+    persistMod.upsertAll(withIds, city).catch((e) => logger.warn(`[search] background persist failed: ${e.message}`));
   });
 
   return payload;
