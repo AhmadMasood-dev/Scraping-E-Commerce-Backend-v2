@@ -29,9 +29,10 @@ async function upsertProduct(item, city) {
     store && Array.isArray(store.cities_physical) && store.cities_physical.includes(cityLc)
   );
 
+  const { _id, ...rest } = item;
   await Product.findOneAndUpdate(
     { store_name: item.store_name, source_url: item.source_url },
-    { $set: { ...item, available_in_store } },
+    { $set: { ...rest, available_in_store }, $setOnInsert: _id ? { _id } : {} },
     { upsert: true, setDefaultsOnInsert: true, runValidators: true }
   );
 }

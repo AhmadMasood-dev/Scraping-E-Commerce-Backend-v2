@@ -57,6 +57,25 @@ test('matches a display-name store_name ("Daraz") to its domain entry ("daraz.pk
   assert.equal(saved.available_in_store, true);
 });
 
+test('upsertProduct puts _id in $setOnInsert, never in $set (so an existing doc\'s _id can never be overwritten)', async () => {
+  Store.find = async () => [];
+  const existingId = new db.mongoose.Types.ObjectId();
+  let update = null;
+  Product.findOneAndUpdate = async (query, u) => { update = u; };
+  await upsertProduct(item({ _id: existingId }), 'islamabad');
+  assert.equal(update.$set._id, undefined);
+  assert.equal(String(update.$setOnInsert._id), String(existingId));
+});
+
+test('upsertProduct omits _id from $setOnInsert when the item has none (Mongo auto-generates on insert)', async () => {
+  Store.find = async () => [];
+  let update = null;
+  Product.findOneAndUpdate = async (query, u) => { update = u; };
+  await upsertProduct(item(), 'islamabad');
+  assert.equal(update.$set._id, undefined);
+  assert.deepEqual(update.$setOnInsert, {});
+});
+
 test('upserts keyed on (store_name, source_url)', async () => {
   Store.find = async () => [];
   let query = null;

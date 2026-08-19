@@ -57,3 +57,22 @@ test('503 when Mongo is not connected', async () => {
   await getProduct({ params: { id: validId } }, res);
   assert.equal(res.statusCode, 503);
 });
+
+test('a slow getReviews (past the deadline) still yields a 200 with the empty shape, not a hang', async () => {
+  const validId = new db.mongoose.Types.ObjectId().toString();
+  Product.findById = () => ({ lean: async () => ({ _id: validId, name_en: 'Slow Product' }) });
+  reviewEngineMod.getReviews = () => new Promise(() => {}); // never resolves — simulates a stuck scrape
+
+  // Fire the race's deadline timer immediately instead of waiting the real 25s, so this test stays fast
+  // and deterministic while still exercising the real Promise.race code path in product.js.
+  const origSetTimeout = global.setTimeout;
+  global.setTimeout = (fn) => origSetTimeout(fn, 0);
+  try {
+    const res = mockRes();
+    await getProduct({ params: { id: validId } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body.reviews, { type: 'none', aggregate_score: null, count: 0, reviews: [] });
+  } finally {
+    global.setTimeout = origSetTimeout;
+  }
+});
