@@ -1,6 +1,6 @@
 // Gemini provider — Google Generative Language REST API (free tier). No SDK; uses global fetch.
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.6-flash'; // gemini-2.5-flash was retired for new users (404) as of 2026-08
 
 async function call({ system, prompt, json = false, model = DEFAULT_MODEL, timeoutMs = 20000 }) {
   const key = process.env.GEMINI_API_KEY;
