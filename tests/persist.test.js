@@ -3,6 +3,7 @@ const { test, beforeEach } = require('node:test');
 const assert = require('node:assert');
 const Store = require('../src/models/Store');
 const Product = require('../src/models/Product');
+const db = require('../src/config/db');
 const { upsertProduct, upsertAll } = require('../src/services/persist');
 
 const origStoreFind = Store.find;
@@ -10,6 +11,7 @@ const origProductUpdate = Product.findOneAndUpdate;
 beforeEach(() => {
   Store.find = origStoreFind;
   Product.findOneAndUpdate = origProductUpdate;
+  db.mongoose.connection.readyState = 1;
 });
 
 const item = (over = {}) => ({
@@ -70,4 +72,15 @@ test('upsertAll isolates a single item failure (does not throw, continues to the
   };
   await upsertAll([item(), item({ source_url: 'https://priceoye.pk/p2' })], 'islamabad');
   assert.equal(calls, 2);
+});
+
+test('upsertAll is a no-op when Mongo is not connected', async () => {
+  db.mongoose.connection.readyState = 0;
+  let storeFindCalled = false;
+  let productUpdateCalled = false;
+  Store.find = async () => { storeFindCalled = true; return []; };
+  Product.findOneAndUpdate = async () => { productUpdateCalled = true; };
+  await upsertAll([item()], 'islamabad');
+  assert.equal(storeFindCalled, false);
+  assert.equal(productUpdateCalled, false);
 });

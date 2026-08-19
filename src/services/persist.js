@@ -9,6 +9,7 @@
 const Store = require('../models/Store');
 const Product = require('../models/Product');
 const logger = require('../config/logger');
+const db = require('../config/db');
 
 function domainKey(s) {
   return String(s || '').toLowerCase().replace(/^www\./, '').split('.')[0];
@@ -31,11 +32,12 @@ async function upsertProduct(item, city) {
   await Product.findOneAndUpdate(
     { store_name: item.store_name, source_url: item.source_url },
     { $set: { ...item, available_in_store } },
-    { upsert: true, setDefaultsOnInsert: true }
+    { upsert: true, setDefaultsOnInsert: true, runValidators: true }
   );
 }
 
 async function upsertAll(items, city) {
+  if (db.mongoose.connection.readyState !== 1) return; // ponytail: no live Mongo connection, nothing to persist
   for (const item of items) {
     try {
       await upsertProduct(item, city);
