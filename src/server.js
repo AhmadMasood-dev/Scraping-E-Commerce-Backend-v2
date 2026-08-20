@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { search } = require('./controllers/search');
 const { getProduct } = require('./controllers/product');
+const { listProducts } = require('./controllers/products');
 const logger = require('./config/logger');
 const db = require('./config/db');
 
@@ -36,6 +37,7 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'pqc-v2' }));
 app.get('/api/v1/search', search);
+app.get('/api/v1/products', listProducts);
 app.get('/api/v1/products/:id', getProduct);
 
 const PORT = process.env.PORT || 8080;
