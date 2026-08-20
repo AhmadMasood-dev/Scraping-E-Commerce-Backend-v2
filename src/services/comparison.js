@@ -56,7 +56,9 @@ function buildComparison(items) {
     if (!cur || price < cur.price_pkr) entriesByStore.set(s, toEntry(it));
   }
   const comparisons = [...entriesByStore.values()].sort((a, b) => a.price_pkr - b.price_pkr);
-  if (comparisons.length === 0) return { primary: null, storeResults };
+  // TC-COMP-01 (UC-03): a comparison needs valid price data from 2+ distinct stores —
+  // anything less is "incomplete" and shouldn't be shown as a comparison card.
+  if (comparisons.length < 2) return { primary: null, storeResults };
 
   const head = best[0];
   const cheapest = comparisons[0];

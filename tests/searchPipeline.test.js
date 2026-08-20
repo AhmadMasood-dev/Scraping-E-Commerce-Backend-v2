@@ -53,6 +53,21 @@ test('full pipeline: direct + extracted → comparison payload', async () => {
   assert.equal(p.cached, false);
 });
 
+// TC-COMP-01 (UC-03) integration check: a single-store find is real product data (still
+// shows up in results.*), but must NOT render as a "comparison" — that requires 2+ stores.
+test('TC-COMP-01: single-store result → no primary comparison, item still in results', async () => {
+  disc.discover = async () => ({
+    links: [],
+    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, image: 'i' }],
+  });
+  normMod.normalizeProducts = passthrough;
+
+  const p = await runSearch({ query: 'iphone 17 pro max', city: 'islamabad' });
+  assert.equal(p.meta.total, 1);
+  assert.equal(p.primary, null);
+  assert.equal(p.results.A.length, 1);
+});
+
 test('relevance filter drops accessories + wrong variants', async () => {
   disc.discover = async () => ({
     links: [],
@@ -130,7 +145,10 @@ test('schedules a background persist of the formatted items (fire-and-forget)', 
 test('attaches primary.similar from similar.findSimilar, called with the primary\'s own key + excluding its own comparison urls', async () => {
   disc.discover = async () => ({
     links: [],
-    directProducts: [{ name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p', image: 'i' }],
+    directProducts: [
+      { name: 'iPhone 17 Pro Max', store_name: 'Daraz', price_pkr: 474999, source_url: 'https://daraz.pk/p', image: 'i' },
+      { name: 'iPhone 17 Pro Max', store_name: 'PriceOye', price_pkr: 468999, source_url: 'https://priceoye.pk/p', image: 'i2' },
+    ],
   });
   normMod.normalizeProducts = async (drafts) => drafts.map((d) => ({ ...d, name_en: 'iPhone 17 Pro Max', category: 'A', product_category: 'Mobile Phones' }));
   let calledWith = null;
@@ -141,8 +159,8 @@ test('attaches primary.similar from similar.findSimilar, called with the primary
   assert.deepEqual(p.primary.similar, [{ name_en: 'iPhone 16', price_pkr: 300000 }]);
   assert.equal(calledWith.product_category, 'Mobile Phones');
   assert.equal(calledWith.category, 'A');
-  assert.equal(calledWith.price_pkr, 474999);
-  assert.deepEqual(calledWith.excludeUrls, ['https://daraz.pk/p']);
+  assert.equal(calledWith.price_pkr, 468999);
+  assert.deepEqual(calledWith.excludeUrls, ['https://priceoye.pk/p', 'https://daraz.pk/p']);
 });
 
 test('no primary (empty results) → similar.findSimilar is never called', async () => {
