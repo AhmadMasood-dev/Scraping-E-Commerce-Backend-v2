@@ -15,7 +15,7 @@ const CITY_LOCATION = {
   multan: 'Multan, Punjab, Pakistan',
 };
 
-async function search(query, { city = 'islamabad', num = 10, timeoutMs = 15000 } = {}) {
+async function search(query, { city = 'islamabad', num = 10, start = 0, timeoutMs = 15000 } = {}) {
   const key = process.env.SERPAPI_KEY;
   if (!key) {
     const e = new Error('SERPAPI_KEY missing');
@@ -30,6 +30,7 @@ async function search(query, { city = 'islamabad', num = 10, timeoutMs = 15000 }
     num: String(num),
     api_key: key,
   });
+  if (start > 0) params.set('start', String(start));
   const loc = CITY_LOCATION[String(city || '').toLowerCase()];
   if (loc) params.set('location', loc);
 

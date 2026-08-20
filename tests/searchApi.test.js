@@ -69,6 +69,19 @@ test('serpapi omits location for an unknown city (falls back to gl=pk)', async (
   assert.ok(!/location=/.test(capturedUrl), 'no location param for an unknown city');
 });
 
+test('serpapi omits start=0 by default, sends start=N when given', async () => {
+  let capturedUrl;
+  global.fetch = async (url) => {
+    capturedUrl = url;
+    return { ok: true, json: async () => ({ organic_results: [] }) };
+  };
+  await serpapi.search('iphone');
+  assert.ok(!/start=/.test(capturedUrl), 'no start param on page 1');
+
+  await serpapi.search('iphone', { start: 10 });
+  assert.match(capturedUrl, /start=10/);
+});
+
 test('serpapi throws an error carrying .status on a non-200 (429)', async () => {
   global.fetch = async () => ({ ok: false, status: 429, json: async () => ({}) });
   await assert.rejects(() => serpapi.search('x'), (e) => e.status === 429);

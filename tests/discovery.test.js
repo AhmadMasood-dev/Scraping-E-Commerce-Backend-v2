@@ -41,3 +41,26 @@ test('one lane failing → the other still returns', async () => {
   assert.deepEqual(links, []);
   assert.equal(directProducts.length, 1);
 });
+test('page 1 < MIN_KEEPERS → fetches page 2 (start=10) and merges', async () => {
+  const calls = [];
+  searchMod.searchWeb = async (query, opts) => {
+    calls.push(opts.start || 0);
+    if (!opts.start) return [{ url: 'https://priceoye.pk/p/1' }];
+    return [{ url: 'https://mercantile.com.pk/p/2' }, { url: 'https://priceoye.pk/p/1' }]; // 2nd is a dupe
+  };
+  directMod.getDarazProducts = async () => [];
+  const { links } = await discover('q', {});
+  assert.deepEqual(calls, [0, 10]);
+  assert.deepEqual(links.map((l) => l.url), ['https://priceoye.pk/p/1', 'https://mercantile.com.pk/p/2']);
+});
+test('page 1 ≥ MIN_KEEPERS → page 2 is never fetched', async () => {
+  const calls = [];
+  searchMod.searchWeb = async (query, opts) => {
+    calls.push(opts.start || 0);
+    return [{ url: 'https://priceoye.pk/p/1' }, { url: 'https://mercantile.com.pk/p/2' }, { url: 'https://x.pk/p/3' }];
+  };
+  directMod.getDarazProducts = async () => [];
+  const { links } = await discover('q', {});
+  assert.deepEqual(calls, [0]);
+  assert.equal(links.length, 3);
+});

@@ -22,6 +22,12 @@ const ACCESSORY = new Set([
   'strap', 'band', 'lens', 'sticker', 'film',
 ]);
 
+// A capacity token (256GB, 512GB, ...) is a strong signal the title is describing an actual
+// device, not a standalone accessory — real stores bundle a free case/adapter into a genuine
+// phone listing's title ("iPhone 17 Pro Max - 256GB + 20W Power Adapter & Silicone Case"),
+// which would otherwise look identical to a pure accessory listing to rule 2 below.
+const HAS_CAPACITY_TOKEN = /\d+\s?(?:gb|tb|mb)\b/i;
+
 // title → array of normalised word tokens (lowercase, punctuation stripped).
 function tokenize(title) {
   return (title || '')
@@ -64,8 +70,13 @@ function filterRelevant(items, query, titleField = 'name') {
     // 1. Every significant query token must appear in the title.
     for (const q of qTokens) if (!tSet.has(q)) return false;
 
-    // 2. Reject accessories the query didn't ask for.
-    for (const t of tSet) if (ACCESSORY.has(t) && !qSet.has(t)) return false;
+    // 2. Reject accessories the query didn't ask for — unless the title has a capacity
+    //    token, which means it's a real device bundled with a free accessory, not the
+    //    accessory itself.
+    const title = item[titleField] || item.name || item.title || '';
+    if (!HAS_CAPACITY_TOKEN.test(title)) {
+      for (const t of tSet) if (ACCESSORY.has(t) && !qSet.has(t)) return false;
+    }
 
     return true;
   });
